@@ -98,9 +98,33 @@ def login_face():
     face_file.save(temp_path)
     score = compare_faces(ref_path, temp_path)
     
-    if score > 0.55: # Toleransi histogram
+    if score > 0.50: # Toleransi histogram
         return jsonify({"status": "success", "message": "Login Berhasil!", "score": round(score, 2)})
     return jsonify({"status": "fail", "message": "Wajah tidak cocok!", "score": round(score, 2)})
+
+@app.route('/login-password', methods=['POST'])
+def login_password():
+    user = request.form.get('username', '').strip()
+    pw = request.form.get('password')
+
+    if not user or not pw:
+        return jsonify({"status": "error", "message": "Isi username & password!"})
+
+    if firebase_connected:
+        # 1. Cari user di Firestore
+        user_ref = db.collection('users').document(user).get()
+        if not user_ref.exists:
+            return jsonify({"status": "error", "message": "User tidak ditemukan!"})
+
+        user_data = user_ref.to_dict()
+        
+        # 2. Verifikasi Password (Hash vs Plain Text)
+        if check_password_hash(user_data['password'], pw):
+            return jsonify({"status": "success", "message": f"Welcome back, {user}!"})
+        else:
+            return jsonify({"status": "fail", "message": "Password salah!"})
+            
+    return jsonify({"status": "error", "message": "Database tidak terhubung!"})
 
 @app.route('/predict', methods=['POST'])
 def predict():

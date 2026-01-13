@@ -25,13 +25,24 @@
 <div class="container">
     <div class="row">
         <div class="col-md-5">
-            <div class="card shadow p-3">
-                <h5 class="text-center mb-3">Login Biomatrik</h5>
-                <video id="webcam" autoplay></video>
-                <input type="text" id="userLogin" class="form-control mt-3" placeholder="Masukkan Username">
-                <button onclick="verifyFace()" class="btn btn-primary mt-2 w-100">Login</button>
-                <div id="loginStatus" class="mt-3 text-center"></div>
-            </div>
+ <div class="card shadow p-3">
+    <h5 class="text-center mb-3">Login System</h5>
+    <video id="webcam" autoplay class="mb-2"></video>
+    
+    <input type="text" id="userLogin" class="form-control mb-2" placeholder="Username">
+    
+    <input type="password" id="passLogin" class="form-control mb-2" placeholder="Password (opsional)">
+    
+    <div class="row g-2">
+        <div class="col-6">
+            <button onclick="verifyFace()" class="btn btn-outline-primary w-100 btn-sm">Login Wajah</button>
+        </div>
+        <div class="col-6">
+            <button onclick="verifyPassword()" class="btn btn-primary w-100 btn-sm">Login Password</button>
+        </div>
+    </div>
+    <div id="loginStatus" class="mt-3 text-center"></div>
+</div>
         </div>
 
         <div class="col-md-7">
@@ -83,6 +94,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+    // --- 1. DEFINISI VARIABEL GLOBAL (HARUS DI ATAS) ---
     const video = document.getElementById('webcam');
     const regVideo = document.getElementById('regWebcam');
     const canvas = document.getElementById('canvas');
@@ -95,7 +107,65 @@
         navigator.mediaDevices.getUserMedia({ video: true }).then(s => regVideo.srcObject = s);
     });
 
-    // 1. FUNGSI REGISTRASI
+    // --- 2. FUNGSI DASHBOARD (MUAT DARI FIREBASE) ---
+    async function loadHistory() {
+        console.log("Memuat riwayat dari Firestore..."); // Cek di Console F12
+        const list = document.getElementById('historyList');
+        try {
+            const response = await fetch('/get-history');
+            const history = await response.json();
+            
+            if (history.length === 0) {
+                list.innerHTML = "<p class='text-center text-muted small p-3'>Belum ada data di Cloud.</p>";
+                return;
+            }
+
+            list.innerHTML = "";
+            history.forEach(item => {
+                let btn = document.createElement('button');
+                btn.className = "list-group-item list-group-item-action d-flex justify-content-between align-items-center";
+                btn.innerHTML = `<div><strong>${item.username}</strong><br><small class="text-muted">Klik untuk muat ulang</small></div>
+                                 <span class="badge bg-primary rounded-pill">${item.predictions[0].breed}</span>`;
+                
+                btn.onclick = () => {
+                    let h = `<div class="alert alert-info py-2">Memuat Riwayat: <b>${item.username}</b></div>`;
+                    item.predictions.forEach(p => {
+                        h += `<small>${p.breed}</small>
+                              <div class="progress mb-2">
+                                <div class="progress-bar bg-info" style="width:${p.conf}">${p.conf}</div>
+                              </div>`;
+                    });
+                    document.getElementById('dogResult').innerHTML = h;
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                };
+                list.appendChild(btn);
+            });
+        } catch (err) {
+            console.error(err);
+            list.innerHTML = "<p class='text-danger text-center small p-3'>Koneksi Cloud Terganggu.</p>";
+        }
+    }
+
+    // --- 3. FUNGSI LOGIN PASSWORD ---
+    async function verifyPassword() {
+        const user = document.getElementById('userLogin').value;
+        const pw = document.getElementById('passLogin').value;
+        if(!user || !pw) return alert("Isi username dan password dulu, Boy!");
+
+        const fd = new FormData();
+        fd.append('username', user);
+        fd.append('password', pw);
+
+        const r = await fetch('/login-password', { method: 'POST', body: fd });
+        const d = await r.json();
+
+        const color = d.status == 'success' ? 'bg-success' : 'bg-danger';
+        document.getElementById('loginStatus').innerHTML = `<span class="badge ${color} p-2 px-3">${d.message}</span>`;
+        
+        if(d.status == 'success') { loadHistory(); }
+    }
+
+    // --- 4. FUNGSI REGISTRASI ---
     async function prosesDaftar() {
         canvas.width = regVideo.videoWidth; canvas.height = regVideo.videoHeight;
         canvas.getContext('2d').drawImage(regVideo, 0, 0);
@@ -109,11 +179,10 @@
         }, 'image/jpeg');
     }
 
-    // 2. FUNGSI LOGIN WAJAH
+    // --- 5. FUNGSI LOGIN WAJAH ---
     async function verifyFace() {
         const user = document.getElementById('userLogin').value;
         if(!user) return alert("Masukkan username dulu!");
-
         canvas.width = video.videoWidth; canvas.height = video.videoHeight;
         canvas.getContext('2d').drawImage(video, 0, 0);
         canvas.toBlob(async b => {
@@ -123,11 +192,12 @@
             const r = await fetch('/login-face', { method: 'POST', body: fd });
             const d = await r.json();
             const color = d.status == 'success' ? 'bg-success' : 'bg-danger';
-            document.getElementById('loginStatus').innerHTML = `<span class="badge ${color} p-2 px-3">${d.message} (Skor: ${d.score || 0})</span>`;
+            document.getElementById('loginStatus').innerHTML = `<span class="badge ${color} p-2 px-3">${d.message}</span>`;
+            if(d.status == 'success') { loadHistory(); }
         }, 'image/jpeg');
     }
 
-    // 3. FUNGSI DETEKSI ANJING
+    // --- 6. FUNGSI DETEKSI ANJING ---
     async function detectBreed() {
         const fileInput = document.getElementById('dogFile');
         const user = document.getElementById('userLogin').value || "Guest";
@@ -136,60 +206,23 @@
         const fd = new FormData();
         fd.append('file', fileInput.files[0]);
         fd.append('username', user);
-
-        document.getElementById('dogResult').innerHTML = "<div class='text-center py-3'><div class='spinner-border text-primary'></div><p>Menganalisis...</p></div>";
+        document.getElementById('dogResult').innerHTML = "Menganalisis...";
         
         const r = await fetch('/predict', { method: 'POST', body: fd });
         const d = await r.json();
         
-        let h = `<div class="alert alert-success">Hasil Analisis untuk <b>${user}</b>:</div>`;
+        let h = `<div class="alert alert-success">Hasil untuk <b>${user}</b>:</div>`;
         d.predictions.forEach(p => {
             h += `<small class="fw-bold">${p.breed}</small>
-                <div class="progress mb-2 shadow-sm">
+                  <div class="progress mb-2 shadow-sm">
                     <div class="progress-bar bg-success progress-bar-striped" style="width:${p.conf}">${p.conf}</div>
-                </div>`;
+                  </div>`;
         });
         document.getElementById('dogResult').innerHTML = h;
         loadHistory(); 
     }
 
-    // 4. FUNGSI DASHBOARD (MUAT DARI FIREBASE)
-    async function loadHistory() {
-        const list = document.getElementById('historyList');
-        try {
-            const response = await fetch('/get-history');
-            const history = await response.json();
-            if (history.length === 0) {
-                list.innerHTML = "<p class='text-center text-muted small p-3'>Belum ada data di Cloud.</p>";
-                return;
-            }
-            list.innerHTML = "";
-            history.forEach(item => {
-                let btn = document.createElement('button');
-                btn.className = "list-group-item list-group-item-action d-flex justify-content-between align-items-center";
-                btn.innerHTML = `<div><strong>${item.username}</strong><br><small class="text-muted">Klik untuk muat ulang</small></div>
-                                <span class="badge bg-primary rounded-pill">${item.predictions[0].breed}</span>`;
-                
-                // Fitur Interactive Reload
-                btn.onclick = () => {
-                    let h = `<div class="alert alert-info py-2">Memuat Riwayat: <b>${item.username}</b></div>`;
-                    item.predictions.forEach(p => {
-                        h += `<small>${p.breed}</small>
-                            <div class="progress mb-2">
-                                <div class="progress-bar bg-info" style="width:${p.conf}">${p.conf}</div>
-                            </div>`;
-                    });
-                    document.getElementById('dogResult').innerHTML = h;
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                };
-                list.appendChild(btn);
-            });
-        } catch (err) {
-            list.innerHTML = "<p class='text-danger text-center small p-3'>Koneksi Cloud Terganggu.</p>";
-        }
-    }
-
-    // Jalankan Dashboard saat halaman dibuka
+    // --- 7. AUTO JALANKAN SAAT START ---
     document.addEventListener('DOMContentLoaded', loadHistory);
 </script>
 </body>
