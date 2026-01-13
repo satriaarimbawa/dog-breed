@@ -5,22 +5,21 @@ from datetime import datetime
 from flask import Flask, render_template, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# --- 1. INISIALISASI FLASK ---
+# 1. INISIALISASI FLASK 
 app = Flask(__name__)
 app.secret_key = "boy_secret_key"
 
-# --- 2. IMPORT AI & FIREBASE ---
+# 2. IMPORT AI & FIREBASE
 import tensorflow as tf
 from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2, preprocess_input, decode_predictions
 from tensorflow.keras.preprocessing import image
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-# --- 3. KONFIGURASI FIREBASE ---
-# Kita fokus ke Firestore karena Storage kamu terkendala billing
+# 3. KONFIGURASI FIREBASE 
 try:
     cred = credentials.Certificate("serviceAccountKey.json")
-    firebase_admin.initialize_app(cred) # Tanpa storageBucket karena offline
+    firebase_admin.initialize_app(cred) 
     db = firestore.client()
     firebase_connected = True
     print("🔥 Firebase Firestore Terhubung!")
@@ -28,7 +27,7 @@ except Exception as e:
     firebase_connected = False
     print(f"⚠️ Firebase Error: {e}. Menjalankan Mode Lokal.")
 
-# --- 4. LOAD MODEL AI & SETUP FOLDER ---
+# 4. LOAD MODEL AI & SETUP FOLDER
 print("🚀 Boy lagi muat model AI MobileNetV2...")
 model = MobileNetV2(weights='imagenet')
 
@@ -37,7 +36,7 @@ FACES_FOLDER = 'database/faces'
 for f in [UPLOAD_FOLDER, FACES_FOLDER]:
     if not os.path.exists(f): os.makedirs(f)
 
-# --- 5. FUNGSI HELPER (AI & OPENCV) ---
+# 5. FUNGSI HELPER (AI & OPENCV) 
 def get_dog_prediction(img_path):
     img = image.load_img(img_path, target_size=(224, 224))
     x = image.img_to_array(img)
@@ -59,7 +58,7 @@ def compare_faces(ref_path, login_path):
     cv2.normalize(h2, h2, 0, 1, cv2.NORM_MINMAX)
     return cv2.compareHist(h1, h2, cv2.HISTCMP_CORREL)
 
-# --- 6. ROUTES ---
+# 6. ROUTES 
 @app.route('/')
 def index():
     return render_template('index.html')
