@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Dog AI - Boy Project</title>
+    <style>
+        #webcam, #regWebcam { width: 100%; border-radius: 10px; background: #000; transform: scaleX(-1); }
+        .card { border-radius: 15px; margin-bottom: 20px; border: none; }
+        .progress { height: 20px; border-radius: 10px; }
+        .list-group-item-action { cursor: pointer; transition: 0.3s; }
+        .list-group-item-action:hover { background-color: #f0f8ff; }
+    </style>
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-dark bg-primary shadow-sm mb-4">
+    <div class="container">
+        <span class="navbar-brand">🐶 Dog Breed <b>AI</b></span>
+        <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#regModal">Daftar Akun</button>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-5">
+            <div class="card shadow p-3">
+                <h5 class="text-center mb-3">Face Login</h5>
+                <video id="webcam" autoplay></video>
+                <input type="text" id="userLogin" class="form-control mt-3" placeholder="Masukkan Username">
+                <button onclick="verifyFace()" class="btn btn-primary mt-2 w-100">Login Sekarang</button>
+                <div id="loginStatus" class="mt-3 text-center"></div>
+            </div>
+        </div>
+
+        <div class="col-md-7">
+            <div class="card shadow p-3">
+                <h5 class="mb-3">Breed Detection (Top 3)</h5>
+                <div class="input-group mb-3">
+                    <input type="file" id="dogFile" class="form-control">
+                    <button onclick="detectBreed()" class="btn btn-warning">Cek Jenis Anjing</button>
+                </div>
+                <div id="dogResult" class="mt-2">
+                    <p class="text-muted text-center italic">Hasil deteksi akan muncul di sini...</p>
+                </div>
+            </div>
+
+            <div class="card shadow p-3 mt-2">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="m-0">📋 Dashboard Riwayat</h5>
+                    <button onclick="loadHistory()" class="btn btn-sm btn-outline-primary">🔄 Refresh Cloud</button>
+                </div>
+                <div id="historyList" class="list-group shadow-sm" style="max-height: 300px; overflow-y: auto;">
+                    <p class="text-muted text-center small p-3">Memuat data dari Firestore...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="regModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Daftar Akun Baru</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="regUser" class="form-control mb-2" placeholder="Username">
+                <input type="password" id="regPass" class="form-control mb-2" placeholder="Password">
+                <video id="regWebcam" autoplay></video>
+                <p class="text-muted small mt-2">Wajah Anda akan disimpan untuk verifikasi biometrik.</p>
+            </div>
+            <div class="modal-footer">
+                <button onclick="prosesDaftar()" class="btn btn-primary w-100">Ambil Foto & Daftar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<canvas id="canvas" style="display:none;"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    const video = document.getElementById('webcam');
+    const regVideo = document.getElementById('regWebcam');
+    const canvas = document.getElementById('canvas');
+
+    // Aktifkan Kamera Utama (Login)
+    navigator.mediaDevices.getUserMedia({ video: true }).then(s => video.srcObject = s);
+
+    // Aktifkan Kamera Modal (Registrasi) saat dibuka
+    document.getElementById('regModal').addEventListener('shown.bs.modal', () => {
+        navigator.mediaDevices.getUserMedia({ video: true }).then(s => regVideo.srcObject = s);
+    });
+
+    // 1. FUNGSI REGISTRASI
+    async function prosesDaftar() {
+        canvas.width = regVideo.videoWidth; canvas.height = regVideo.videoHeight;
+        canvas.getContext('2d').drawImage(regVideo, 0, 0);
+        canvas.toBlob(async b => {
+            const fd = new FormData();
+            fd.append('username', document.getElementById('regUser').value);
+            fd.append('password', document.getElementById('regPass').value);
+            fd.append('face_image', b, 'f.jpg');
+            const r = await fetch('/register', { method: 'POST', body: fd });
+            const d = await r.json(); alert(d.message); location.reload();
+        }, 'image/jpeg');
+    }
+
+    // 2. FUNGSI LOGIN WAJAH
+    async function verifyFace() {
+        const user = document.getElementById('userLogin').value;
+        if(!user) return alert("Masukkan username dulu!");
+
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        canvas.toBlob(async b => {
+            const fd = new FormData();
+            fd.append('username', user);
+            fd.append('face_image', b, 'f.jpg');
+            const r = await fetch('/login-face', { method: 'POST', body: fd });
+            const d = await r.json();
+            const color = d.status == 'success' ? 'bg-success' : 'bg-danger';
+            document.getElementById('loginStatus').innerHTML = `<span class="badge ${color} p-2 px-3">${d.message} (Skor: ${d.score || 0})</span>`;
+        }, 'image/jpeg');
+    }
+
+    // 3. FUNGSI DETEKSI ANJING
+    async function detectBreed() {
+        const fileInput = document.getElementById('dogFile');
+        const user = document.getElementById('userLogin').value || "Guest";
+        if(!fileInput.files[0]) return alert("Pilih foto anjing dulu!");
+
+        const fd = new FormData();
+        fd.append('file', fileInput.files[0]);
+        fd.append('username', user);
+
+        document.getElementById('dogResult').innerHTML = "<div class='text-center py-3'><div class='spinner-border text-primary'></div><p>Menganalisis...</p></div>";
+        
+        const r = await fetch('/predict', { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        let h = `<div class="alert alert-success">Hasil Analisis untuk <b>${user}</b>:</div>`;
+        d.predictions.forEach(p => {
+            h += `<small class="fw-bold">${p.breed}</small>
+                  <div class="progress mb-2 shadow-sm">
+                    <div class="progress-bar bg-success progress-bar-striped" style="width:${p.conf}">${p.conf}</div>
+                  </div>`;
+        });
+        document.getElementById('dogResult').innerHTML = h;
+        loadHistory(); // Refresh riwayat setelah deteksi baru
+    }
+
+    // 4. FUNGSI DASHBOARD (MUAT DARI FIREBASE)
+    async function loadHistory() {
+        const list = document.getElementById('historyList');
+        try {
+            const response = await fetch('/get-history');
+            const history = await response.json();
+            if (history.length === 0) {
+                list.innerHTML = "<p class='text-center text-muted small p-3'>Belum ada data di Cloud.</p>";
+                return;
+            }
+            list.innerHTML = "";
+            history.forEach(item => {
+                let btn = document.createElement('button');
+                btn.className = "list-group-item list-group-item-action d-flex justify-content-between align-items-center";
+                btn.innerHTML = `<div><strong>${item.username}</strong><br><small class="text-muted">Klik untuk muat ulang</small></div>
+                                 <span class="badge bg-primary rounded-pill">${item.predictions[0].breed}</span>`;
+                
+                // Fitur Interactive Reload
+                btn.onclick = () => {
+                    let h = `<div class="alert alert-info py-2">Memuat Riwayat: <b>${item.username}</b></div>`;
+                    item.predictions.forEach(p => {
+                        h += `<small>${p.breed}</small>
+                              <div class="progress mb-2">
+                                <div class="progress-bar bg-info" style="width:${p.conf}">${p.conf}</div>
+                              </div>`;
+                    });
+                    document.getElementById('dogResult').innerHTML = h;
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                };
+                list.appendChild(btn);
+            });
+        } catch (err) {
+            list.innerHTML = "<p class='text-danger text-center small p-3'>Koneksi Cloud Terganggu.</p>";
+        }
+    }
+
+    // Jalankan Dashboard saat halaman dibuka
+    document.addEventListener('DOMContentLoaded', loadHistory);
+</script>
+</body>
+</html>

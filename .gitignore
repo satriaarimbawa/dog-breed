@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+
+# Folder Lokal
+static/uploads/*
+database/faces/*
+!static/uploads/.gitkeep
+!database/faces/.gitkeep
+
+# Firebase (PENTING: Jangan push kunci rahasia!)
+serviceAccountKey.json
