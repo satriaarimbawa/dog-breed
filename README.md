@@ -1,2 +1,2 @@
 # dog-breed
-project login biometrik berbasis bahasa pemrograman python
+project login biometrik sederhana berbasis bahasa pemrograman python dan firebase
