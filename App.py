@@ -7,7 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 # 1. INISIALISASI FLASK 
 app = Flask(__name__)
-app.secret_key = "boy_secret_key"
+app.secret_key = "satria_secret_id"
 
 # 2. IMPORT AI & FIREBASE
 import tensorflow as tf
@@ -22,13 +22,13 @@ try:
     firebase_admin.initialize_app(cred) 
     db = firestore.client()
     firebase_connected = True
-    print("🔥 Firebase Firestore Terhubung!")
+    print("selamat firebase terhubung!")
 except Exception as e:
     firebase_connected = False
-    print(f"⚠️ Firebase Error: {e}. Menjalankan Mode Lokal.")
+    print(f" Firebasemu lagi error: {e}. Menjalankan Mode Lokal.")
 
 # 4. LOAD MODEL AI & SETUP FOLDER
-print("🚀 Boy lagi muat model AI MobileNetV2...")
+print("Tunggu Boy lagi muat model AI MobileNetV2...")
 model = MobileNetV2(weights='imagenet')
 
 UPLOAD_FOLDER = 'static/uploads'
@@ -36,7 +36,7 @@ FACES_FOLDER = 'database/faces'
 for f in [UPLOAD_FOLDER, FACES_FOLDER]:
     if not os.path.exists(f): os.makedirs(f)
 
-# 5. FUNGSI HELPER (AI & OPENCV) 
+# 5. FUNGSI HELPER  
 def get_dog_prediction(img_path):
     img = image.load_img(img_path, target_size=(224, 224))
     x = image.img_to_array(img)
